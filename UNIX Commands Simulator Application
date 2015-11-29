@@ -2,7 +2,7 @@
 Author: Sunkist Mehta (113765841)
 Date and time: 09/28/2015 22:38
 Problem Statement: Emulate UNIX functions - cp, more, interleave, grep, wc using C on text files
-Compile using gcc file_name.c.
+Compile using gcc file_name.c
 
 To simulate UNIX command 'cp' i.e. make identical copy of file1 into file2, run as: a.out 0 file1.txt file2.txt
 
