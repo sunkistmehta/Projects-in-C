@@ -2,7 +2,7 @@
 Author: Sunkist Mehta (113765841)
 Date and time: 09/28/2015 22:38
 Problem Statement: Emulate UNIX functions - cp, more, interleave, grep, wc using C on text files
-Compile using gcc file_name.c
+Compile using gcc file_name.c.
 
 To simulate UNIX command 'cp' i.e. make identical copy of file1 into file2, run as: a.out 0 file1.txt file2.txt
 
@@ -258,7 +258,7 @@ int main(int argc, char *argv[]){
 					}
 					/*conditions when a newline is encountered*/
 					else {
-						charCount++; 								//adding 1 to the total count in each iteration of while owing to a '\n'
+						charCount++; 					//adding 1 to the total count in each iteration of while owing to a '\n'
 						if (isalnum(wcArr[i-1])) wordCount++;		//counting the last word of line only if ending with a alphanumeric character
 
 						/*checking for last word of line if it is the longest same as before*/
