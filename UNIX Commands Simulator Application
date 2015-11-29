@@ -1,0 +1,300 @@
+/*
+Author: Sunkist Mehta (113765841)
+Date and time: 09/28/2015 22:38
+Problem Statement: Emulate UNIX functions - cp, more, interleave, grep, wc using C on text files
+*/
+
+#include<stdio.h> 
+#include<stdlib.h> 
+#include<string.h>
+#include<ctype.h>
+#define MAXLINE 100 // maximum length of line in input file 
+#define MAXWORD 30	// maximum length of word in input file 
+
+/*function to print out usagemenu in events of incorrect commands*/
+void usagemenu(){
+printf("USAGE MENU:\na.out 0 file1.txt file2.txt\na.out 1 file1.txt file2.txt file3.txt\na.out 2 file1.txt\na.out 3 file1.txt\na.out 4 file1.txt\n\n");
+printf("0:copy\n1:interleave\n2:more\n3:grep\n4:Word count\n\n");
+}
+
+/*functiom to terminate the program*/
+void terminate(){
+printf("Program Terminated\n");
+exit(0);
+}
+
+/*function to open files with error message*/
+FILE* fOpen(const char *file, const char *mode){
+	FILE *f = fopen(file, mode);
+	if (f == NULL){
+		printf("%s cannot open\n", file);
+		terminate();
+	}
+	return f;
+}
+
+/*main*/
+int main(int argc, char *argv[]){
+	char data;
+	char arr[100];
+	FILE *f1, *f2, *f3;
+	switch(*argv[1]){
+		/*Copy*/
+		case '0':
+			/*checks number of command line arguments*/
+			if(argc != 4){
+				usagemenu();
+				terminate();
+			}
+			/*opens files to operate on*/
+			f1= fOpen(argv[2], "r");				
+			f2= fOpen(argv[3], "w+");
+			
+			/*loop to copy from one file to other*/
+			while (fgets(arr, MAXLINE, f1) != NULL)
+				fprintf(f2, arr);
+			
+			/*closes files*/
+			fclose(f1);
+			fclose(f2);				
+			break;
+		
+		/*Interleave*/		
+		case '1':
+			/*checks number of command line arguments*/
+			if(argc != 5){
+				usagemenu();
+				terminate();
+			}			
+			
+			/*opens files to operate on*/
+			f1= fOpen(argv[2], "r");	
+			f2= fOpen(argv[3], "r");
+			f3= fOpen(argv[4], "w+"); 
+			
+			int flag = 1/*, eofFlag = 1* needed on Windows*/;			//flags used for interleave opaeration
+			
+			/*loop to iterate over files and interleave*/
+			while(1){
+				/*determines which file to read from using 'flag' and writes in 3rd file*/
+				if (flag && (fgets(arr, 100, f1) != NULL))
+					fprintf(f3, arr);
+				if (!flag && (fgets(arr, 100, f2) != NULL))
+					fprintf(f3, arr);
+				
+				/*condition to print the remaining lines of one of the 
+				files (in case of dissimilar no. of lines in both files)from a new line onward*/
+				/*if ((eofFlag) && (feof(f1) || feof(f2))){
+					fprintf(f3, "\n");
+					eofFlag = 0;
+				}*/			
+				
+				flag = !flag;					//invert flag status after each iteration
+				if ((feof(f1)) && (feof(f2)))	//ends loop if EOF is reached for both files
+					break;	
+			}
+			
+			/*closes files*/
+			fclose(f1);
+			fclose(f2);	
+			fclose(f3);	
+			break;
+			
+		/*More*/	
+		case '2':
+			/*checks number of command line arguments*/
+			if(argc != 3){
+				usagemenu();
+				terminate();
+			}
+			f1= fOpen(argv[2], "r");			//opens file to operate on
+			
+			char input;
+			int newlineCount = 0;
+			int c = 0;
+			
+			/*loop to iterate over file and print lines*/
+			while(fgets(arr, 100, f1) != NULL){
+				/*prints first 10 lines*/
+				if (newlineCount < 10){
+					printf("%s", arr);
+					newlineCount++;
+				}
+				/*prints depending on user input*/					
+				if (newlineCount >= 10){
+					printf("Enter option: ");	//requesting user input on a new line
+					scanf(" %c", &input); 		//" %c" instead of "%c" to avoid a newline character being accepted for next iteration
+					switch(input){
+						case 'n':
+							newlineCount = 9;	//for one more iteration of fgets and printf
+							break;
+							
+						case 'p':
+							newlineCount = 0;	//for ten more iterations of fgets and printf
+							break;
+						
+						case 'q':
+							terminate();		//for terminating the program
+							
+						default:
+							printf("You did not enter correct option\n");
+							terminate();		//for terminating the program in case of incorrect user input		
+					}
+				}
+				if (feof(f1)) break;			//ends loop if EOF is reached
+			}
+			fclose(f1);							//closes file
+			break;
+		
+		/*Grep*/		
+		case '3':
+			/*checking number of command line arguments*/
+			if(argc != 3){
+				usagemenu();
+				terminate();
+			}
+			f1= fOpen(argv[2], "r");			//opens file to operate on
+			
+			char searchArr[10];					//array to store string entered by user
+			printf("Input search string (10 chars max): ");
+			scanf("%s", searchArr);
+			char *ptr;
+			
+			/*loop to iterate over file and search string*/
+			while(fgets(arr, MAXLINE, f1) != NULL){
+				ptr = strstr(arr, searchArr);	//searches a string in another (actually character arrays)
+				if(ptr)	printf("%s", arr);
+			}
+			
+			fclose(f1);							//closes file
+			break;
+		
+		/*Word count*/
+		case '4':
+			/*checking number of command line arguments*/
+			if(argc != 3){
+				usagemenu();
+				terminate();
+			}					
+			f1= fOpen(argv[2], "r");			//opens file to operate on
+			
+			/*declaration and initialization of arrays, counts, iterators*/
+			char wcArr[MAXLINE], charShortArr[MAXLINE], wordShortArr[MAXLINE];
+			char longWord[MAXWORD], longerWord[MAXWORD], longestWord[MAXWORD], wordLongArr[MAXWORD];
+			int lineCount = 0, wordCount = 0, charCount = 0, charSLcount = MAXLINE, wordSLcount = MAXLINE;
+			int	totalCharCount = 0, totalWordCount = 0, charWordCount = 0, longWordCount = 0, longerWordCount = 0, longestWordCount = 0;
+			int	i, n; //iterators for loops
+			
+			/*loop to iterate over file and calculate mentioned*/
+			while(fgets(wcArr, MAXLINE, f1) != NULL){
+				lineCount++; 	//counting lines
+				n = 0;			//initializing index of temporary word array at the beginning of each line
+				
+				/*loop which traverses each character of a line*/
+				for(i = 0; i < MAXLINE; i++){
+					if ((wcArr[i] != '\n') && (wcArr[i] !='\0')){		//checks if end of line is reached
+						charCount++;									//counting characters in a line
+						
+						if (!isalnum(wcArr[i])){						//checks if character is not alphanumeric
+							if (i == 0) continue;						//special case of first character of line not being alphanumeric					
+							if(isalnum(wcArr[i-1])){					//checks if previous character is alphanumeric
+								wordCount++; 							//counting words in each line
+								wordLongArr[n] = '\0';					//terminating a word with NULL
+								n = 0;									//initializing index of temporary array to store next word
+								charWordCount = strlen(wordLongArr);	//counts characters in a word
+								
+								/*compares with no. of characters of longest word*/
+								if (charWordCount > longestWordCount){
+									strcpy(longestWord, wordLongArr);
+									longestWordCount = charWordCount;
+								}
+								else{
+									/*compares with no. of characters of 2nd longest word*/
+									if (charWordCount > longerWordCount){	
+										strcpy(longerWord, wordLongArr);
+											longerWordCount = charWordCount;
+									}
+									else{
+										/*compares with no. of characters of 3rd longest word*/
+										if (charWordCount > longWordCount){	
+											strcpy(longWord, wordLongArr);
+											longWordCount = charWordCount;
+										}									
+									}
+								}
+							}
+						}
+						/*stores word in a temporary array*/
+						else{
+							wordLongArr[n] = wcArr[i];					
+							n++;
+						}
+					}
+					/*conditions when a newline is encountered*/
+					else {
+						charCount++; 								//adding 1 to the total count in each iteration of while owing to a '\n'
+						if (isalnum(wcArr[i-1])) wordCount++;		//counting the last word of line only if ending with a alphanumeric character
+						
+						/*checking for last word of line if it is the longest same as before*/
+						charWordCount = strlen(wordLongArr);
+						
+						if (charWordCount > longestWordCount){
+							strcpy(longestWord, wordLongArr);
+							longestWordCount = charWordCount;
+						}
+						else{
+							if (charWordCount > longerWordCount){
+								strcpy(longerWord, wordLongArr);
+									longerWordCount = charWordCount;
+							}
+							else{
+								if (charWordCount > longWordCount){
+									strcpy(longWord, wordLongArr);
+									longWordCount = charWordCount;
+								}					
+							}
+						}
+						break;
+					}
+				}
+				
+				/*storing the shortest line in terms of characters*/
+				if (charCount < charSLcount){
+					strcpy(charShortArr, wcArr);
+					charSLcount = charCount;
+				}
+				
+				/*storing the shortest line in terms of words*/
+				if (wordCount < wordSLcount){
+					strcpy(wordShortArr, wcArr);
+					wordSLcount = wordCount;
+				}
+				
+				/*counting total characters and words in file*/
+				totalCharCount += charCount;
+				totalWordCount += wordCount;
+				/*initialization for next iteration i.e. next line in file*/
+				charCount = 0;
+				wordCount = 0;
+				
+			}
+			
+			/*Printing required counts, lines and words*/			
+			printf("The number of characters is: %d\n", totalCharCount);
+			printf("The number of words : %d\n", totalWordCount);
+			printf("The number of lines is: %d\n", lineCount);
+			printf("The shortest line (%d characters): %s", charSLcount, charShortArr);
+			printf("The shortest line (%d words): %s", wordSLcount, wordShortArr);
+			printf("The top three longest words are: %s, %s, %s\n", longestWord, longerWord, longWord);
+			
+			fclose(f1);	//closes file
+			break; 
+		
+		/*print usage menu and terminate program*/		
+		default:
+			usagemenu();
+			terminate();
+	}
+			
+	return 0;
+}
