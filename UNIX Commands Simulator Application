@@ -1,52 +1,34 @@
 /*
 Author: Sunkist Mehta (113765841)
-Date and time: 09/28/2015 22:38
-Problem Statement: Emulate UNIX functions - cp, more, interleave, grep, wc using C on text files
-Compile using gcc file_name.c.
-
-To simulate UNIX command 'cp' i.e. make identical copy of file1 into file2, run as: a.out 0 file1.txt file2.txt
-
-To interleave lines of file1 and file2 into file3, run as: a.out 1 file1.txt file2.txt file3.txt file4.txt
-The first line of file3 is first line of file1.
-The second line of file3 is first line of file2.
-The third line of file3 is second line of file2.
-The fourth line of file3 is second line of file2.
-...
-
-To simulate UNIX command 'more' i.e. print out first 10 lines of file1
-and wait for user input, run as : a.out 2	file1.txt
-If user inputs 'n', print next line.
-If user inputs 'p', print next ten lines.
-if user inputs 'q', terminate program.
-
-To simulate UNIX command 'grep' i.e. accept user input string(10 chars max)
-and print out every line in file1 that contains the string,
-run as: a.out 0 file1.txt
-
-To simulate UNIX command 'wc' i.e. print out following information about:
-number of lines, number of words, number of characters,
-shortest line in terms of characters, shortest line in terms of words,
-top three longest words;
-run as: a.out 4 file1.txt
+Date and time: 11/24/2015 22:05
+Problem Statement:
+Calculator for "infinitely" long numbers
 */
 
 #include<stdio.h>
 #include<stdlib.h>
-#include<string.h>
-#include<ctype.h>
-#define MAXLINE 100 // maximum length of line in input file
-#define MAXWORD 30	// maximum length of word in input file
+#include<cmath.h>
 
-/*function to print out usagemenu in events of incorrect commands*/
-void usagemenu(){
-printf("USAGE MENU:\na.out 0 file1.txt file2.txt\na.out 1 file1.txt file2.txt file3.txt\na.out 2 file1.txt\na.out 3 file1.txt\na.out 4 file1.txt\n\n");
-printf("0:copy\n1:interleave\n2:more\n3:grep\n4:Word count\n\n");
-}
+#define NEW(x) (x*)calloc(1, sizeof(x));
 
-/*functiom to terminate the program*/
+/*definition of struct of block*/
+typedef struct block
+{
+    int val; 
+    struct block *prev, *next;	// attributes of doubly linked list
+}BLOCK;
+
+/*definition of struct of number*/
+typedef struct number
+{
+	BLOCK *head, *tail; 		//to help maintain the linked list
+	unsigned long long opCount;	//no. of block operation counts in calculating this number i.e. for output use only
+}NUMBER;
+
+/*function to terminate the program*/
 void terminate(){
-printf("Program Terminated\n");
-exit(0);
+	printf("Program Terminated\n");
+	exit(0);
 }
 
 /*function to open files with error message*/
@@ -59,268 +41,514 @@ FILE* fOpen(const char *file, const char *mode){
 	return f;
 }
 
-/*main*/
-int main(int argc, char *argv[]){
-	char data;
-	char arr[100];
-	FILE *f1, *f2, *f3;
-	switch(*argv[1]){
-		/*Copy*/
-		case '0':
-			/*checks number of command line arguments*/
-			if(argc != 4){
-				usagemenu();
-				terminate();
-			}
-			/*opens files to operate on*/
-			f1= fOpen(argv[2], "r");
-			f2= fOpen(argv[3], "w+");
+/*function to calculate the size of the file i.e. length of the number*/
+unsigned long long findLength(FILE *f){
+	unsigned long long numLength = 0;
+	fseek(f, 0, SEEK_END);	// setting file pointer at EOF
+    numLength = ftell(f);   // get position of file pointer
+	rewind(f);				// setting file pointer back to the start
+	return numLength;
+}
 
-			/*loop to copy from one file to other*/
-			while (fgets(arr, MAXLINE, f1) != NULL)
-				fprintf(f2, arr);
-
-			/*closes files*/
-			fclose(f1);
-			fclose(f2);
-			break;
-
-		/*Interleave*/
-		case '1':
-			/*checks number of command line arguments*/
-			if(argc != 5){
-				usagemenu();
-				terminate();
-			}
-
-			/*opens files to operate on*/
-			f1= fOpen(argv[2], "r");
-			f2= fOpen(argv[3], "r");
-			f3= fOpen(argv[4], "w+");
-
-			int flag = 1/*, eofFlag = 1* needed on Windows*/;			//flags used for interleave opaeration
-
-			/*loop to iterate over files and interleave*/
-			while(1){
-				/*determines which file to read from using 'flag' and writes in 3rd file*/
-				if (flag && (fgets(arr, 100, f1) != NULL))
-					fprintf(f3, arr);
-				if (!flag && (fgets(arr, 100, f2) != NULL))
-					fprintf(f3, arr);
-
-				/*condition to print the remaining lines of one of the
-				files (in case of dissimilar no. of lines in both files)from a new line onward*/
-				/*if ((eofFlag) && (feof(f1) || feof(f2))){
-					fprintf(f3, "\n");
-					eofFlag = 0;
-				}*/
-
-				flag = !flag;					//invert flag status after each iteration
-				if ((feof(f1)) && (feof(f2)))	//ends loop if EOF is reached for both files
-					break;
-			}
-
-			/*closes files*/
-			fclose(f1);
-			fclose(f2);
-			fclose(f3);
-			break;
-
-		/*More*/
-		case '2':
-			/*checks number of command line arguments*/
-			if(argc != 3){
-				usagemenu();
-				terminate();
-			}
-			f1= fOpen(argv[2], "r");			//opens file to operate on
-
-			char input;
-			int newlineCount = 0;
-			int c = 0;
-
-			/*loop to iterate over file and print lines*/
-			while(fgets(arr, 100, f1) != NULL){
-				/*prints first 10 lines*/
-				if (newlineCount < 10){
-					printf("%s", arr);
-					newlineCount++;
-				}
-				/*prints depending on user input*/
-				if (newlineCount >= 10){
-					printf("Enter option: ");	//requesting user input on a new line
-					scanf(" %c", &input); 		//" %c" instead of "%c" to avoid a newline character being accepted for next iteration
-					switch(input){
-						case 'n':
-							newlineCount = 9;	//for one more iteration of fgets and printf
-							break;
-
-						case 'p':
-							newlineCount = 0;	//for ten more iterations of fgets and printf
-							break;
-
-						case 'q':
-							terminate();		//for terminating the program
-
-						default:
-							printf("You did not enter correct option\n");
-							terminate();		//for terminating the program in case of incorrect user input
-					}
-				}
-				if (feof(f1)) break;			//ends loop if EOF is reached
-			}
-			fclose(f1);							//closes file
-			break;
-
-		/*Grep*/
-		case '3':
-			/*checking number of command line arguments*/
-			if(argc != 3){
-				usagemenu();
-				terminate();
-			}
-			f1= fOpen(argv[2], "r");			//opens file to operate on
-
-			char searchArr[10];					//array to store string entered by user
-			printf("Input search string (10 chars max): ");
-			scanf("%s", searchArr);
-			char *ptr;
-
-			/*loop to iterate over file and search string*/
-			while(fgets(arr, MAXLINE, f1) != NULL){
-				ptr = strstr(arr, searchArr);	//searches a string in another (actually character arrays)
-				if(ptr)	printf("%s", arr);
-			}
-
-			fclose(f1);							//closes file
-			break;
-
-		/*Word count*/
-		case '4':
-			/*checking number of command line arguments*/
-			if(argc != 3){
-				usagemenu();
-				terminate();
-			}
-			f1= fOpen(argv[2], "r");			//opens file to operate on
-
-			/*declaration and initialization of arrays, counts, iterators*/
-			char wcArr[MAXLINE], charShortArr[MAXLINE], wordShortArr[MAXLINE];
-			char longWord[MAXWORD], longerWord[MAXWORD], longestWord[MAXWORD], wordLongArr[MAXWORD];
-			int lineCount = 0, wordCount = 0, charCount = 0, charSLcount = MAXLINE, wordSLcount = MAXLINE;
-			int	totalCharCount = 0, totalWordCount = 0, charWordCount = 0, longWordCount = 0, longerWordCount = 0, longestWordCount = 0;
-			int	i, n; //iterators for loops
-
-			/*loop to iterate over file and calculate mentioned*/
-			while(fgets(wcArr, MAXLINE, f1) != NULL){
-				lineCount++; 	//counting lines
-				n = 0;			//initializing index of temporary word array at the beginning of each line
-
-				/*loop which traverses each character of a line*/
-				for(i = 0; i < MAXLINE; i++){
-					if ((wcArr[i] != '\n') && (wcArr[i] !='\0')){		//checks if end of line is reached
-						charCount++;									//counting characters in a line
-
-						if (!isalnum(wcArr[i])){						//checks if character is not alphanumeric
-							if (i == 0) continue;						//special case of first character of line not being alphanumeric
-							if(isalnum(wcArr[i-1])){					//checks if previous character is alphanumeric
-								wordCount++; 							//counting words in each line
-								wordLongArr[n] = '\0';					//terminating a word with NULL
-								n = 0;									//initializing index of temporary array to store next word
-								charWordCount = strlen(wordLongArr);	//counts characters in a word
-
-								/*compares with no. of characters of longest word*/
-								if (charWordCount > longestWordCount){
-									strcpy(longestWord, wordLongArr);
-									longestWordCount = charWordCount;
-								}
-								else{
-									/*compares with no. of characters of 2nd longest word*/
-									if (charWordCount > longerWordCount){
-										strcpy(longerWord, wordLongArr);
-											longerWordCount = charWordCount;
-									}
-									else{
-										/*compares with no. of characters of 3rd longest word*/
-										if (charWordCount > longWordCount){
-											strcpy(longWord, wordLongArr);
-											longWordCount = charWordCount;
-										}
-									}
-								}
-							}
-						}
-						/*stores word in a temporary array*/
-						else{
-							wordLongArr[n] = wcArr[i];
-							n++;
-						}
-					}
-					/*conditions when a newline is encountered*/
-					else {
-						charCount++; 					//adding 1 to the total count in each iteration of while owing to a '\n'
-						if (isalnum(wcArr[i-1])) wordCount++;		//counting the last word of line only if ending with a alphanumeric character
-
-						/*checking for last word of line if it is the longest same as before*/
-						charWordCount = strlen(wordLongArr);
-
-						if (charWordCount > longestWordCount){
-							strcpy(longestWord, wordLongArr);
-							longestWordCount = charWordCount;
-						}
-						else{
-							if (charWordCount > longerWordCount){
-								strcpy(longerWord, wordLongArr);
-									longerWordCount = charWordCount;
-							}
-							else{
-								if (charWordCount > longWordCount){
-									strcpy(longWord, wordLongArr);
-									longWordCount = charWordCount;
-								}
-							}
-						}
-						break;
-					}
-				}
-
-				/*storing the shortest line in terms of characters*/
-				if (charCount < charSLcount){
-					strcpy(charShortArr, wcArr);
-					charSLcount = charCount;
-				}
-
-				/*storing the shortest line in terms of words*/
-				if (wordCount < wordSLcount){
-					strcpy(wordShortArr, wcArr);
-					wordSLcount = wordCount;
-				}
-
-				/*counting total characters and words in file*/
-				totalCharCount += charCount;
-				totalWordCount += wordCount;
-				/*initialization for next iteration i.e. next line in file*/
-				charCount = 0;
-				wordCount = 0;
-
-			}
-
-			/*Printing required counts, lines and words*/
-			printf("The number of characters is: %d\n", totalCharCount);
-			printf("The number of words : %d\n", totalWordCount);
-			printf("The number of lines is: %d\n", lineCount);
-			printf("The shortest line (%d characters): %s", charSLcount, charShortArr);
-			printf("The shortest line (%d words): %s", wordSLcount, wordShortArr);
-			printf("The top three longest words are: %s, %s, %s\n", longestWord, longerWord, longWord);
-
-			fclose(f1);	//closes file
-			break;
-
-		/*print usage menu and terminate program*/
-		default:
-			usagemenu();
-			terminate();
+/*function to create a single block and add it to a linked list*/
+void createBlock(NUMBER *num, int val, int io){
+	BLOCK *p = NEW(BLOCK);	// pointer to a new BLOCK to be created
+	p->val = val;			// storing the digits in block pointed by p 
+	
+	/*io determines if BLOCK is to be inserted at head or inserted at tail.
+	If creating lists from input i.e files, io = 1;
+	If creating for output i.e during calculations, io = 0;*/
+	if (io){
+		/*condition will occur if the list is empty*/
+		if(num->head == NULL)
+			num->head = num->tail= p;
+		/*insert at tail*/
+		else{
+			p->prev = num->tail;
+			num->tail->next = p;
+			num->tail = p;
+		}
 	}
+	else{
+		/*condition will occur if the list is empty*/
+		if(num->tail == NULL)
+			num->head = num->tail= p;
+		/*insert at head*/
+		else{
+			p->next = num->head;
+			num->head->prev = p;
+			num->head = p;
+		}
+	}
+	return;
+}
 
-	return 0;
+/*function to create linked list (representing number) of blocks of size k each*/
+void createNum(FILE *f, NUMBER *numList, unsigned long long numLength, int k){
+	int modVal = numLength % k;	// to find if block at head has to be of size k or not
+	int temp, readVal, value;
+	
+	/*loop to create linked list*/
+	while(numLength > 0){
+		/*if block at head is not of size k. E.g.: 1<>234<>567*/ 
+		if (modVal){
+			value = 0;
+			/*loop to create block at head if other than size k*/
+			for(temp = modVal-1; temp >= 0; temp--){
+				fscanf(f, "%1d", &readVal);		//reading 1 digit
+				value += readVal*pow(10, temp);
+			}
+			createBlock(numList, value, 1);
+			numLength -= modVal;
+			modVal = 0;
+		}
+		else{
+			value = 0;
+			/*loop to create remaining blocks of size k*/
+			for(temp = k-1; temp >= 0; temp--){
+				fscanf(f, "%1d", &readVal);
+				value = value + readVal*pow(10, temp);
+			}
+			createBlock(numList, value, 1);
+			numLength -= k;
+		}
+	}
+	return;
+}
+
+/*function to display numbers on command line - used mainly for debugging*/
+void displayNumList(NUMBER *numList){
+	printf("\nDisplaying Number\n");
+	BLOCK *temp;
+	if (numList != NULL){
+		temp = numList->head;
+		printf("NULL<->");
+		while (temp != NULL){
+			printf("%d<->", temp->val);
+			temp = temp->next;
+		}
+		printf("NULL\n");
+	}
+	if (numList->opCount != 1)
+		printf("%llu block operations\n", numList->opCount);
+	else printf("%d block operation\n", 1);
+	return;
+}
+
+/*function to add two linked lists i.e. numbers*/
+NUMBER* add(NUMBER *numList1, NUMBER *numList2, int k){
+	BLOCK *currBlock1, *currBlock2;
+	NUMBER *addList = NEW(NUMBER);
+	unsigned long long addCount = 0, carryCount = 0;	// no. of additions can be as much as number of digits i.e. long long
+	unsigned int power = pow(10, k);					// k <= 4; 10^k <= 10000;
+	unsigned int sum, carry = 0;						// worst case sum = 9999 + 9999 = 19998; carry = 0 or 1;
+	
+	/*initializing pointers to the tail of linked lists i.e last blocks*/
+	currBlock1 = numList1->tail;
+	currBlock2 = numList2->tail;
+	
+	/*loop to traverse through linked lists until one of them reaches its head*/
+	while (currBlock1 != NULL && currBlock2 != NULL){
+		sum = currBlock1->val + currBlock2->val + carry;	// main addition
+		
+		/*counting block operations for addition of non-zero values and carry*/
+		if (currBlock1->val != 0 && currBlock2->val != 0)
+			addCount++;
+		if (carry)
+			carryCount++;
+		
+		/*setting values of block and carry*/
+		if (sum == 0)	carry = 0;
+		else{
+			carry = sum/power;
+			sum = sum%power;
+		}
+		
+		/*create resultant block and traverse to previous block*/
+		createBlock(addList, sum, 0);	
+		currBlock1 = currBlock1->prev;
+		currBlock2 = currBlock2->prev;
+	}
+	
+	/*loop to traverse the remaining blocks of 1st linked list*/
+	while(currBlock1 != NULL){
+		/*only carry if present, has to be added*/
+		if (carry){
+			sum = currBlock1->val + carry;
+			carryCount++;
+			carry = sum/power;
+			sum = sum%power;
+		}
+		else{
+			sum = currBlock1->val;
+		}
+		/*create resultant block and traverse to previous block*/
+		createBlock(addList, sum, 0);
+		currBlock1 = currBlock1->prev;
+	}
+	
+	/*loop to traverse the remaining blocks of 2nd linked list*/
+	while(currBlock2 != NULL){
+		if(carry){
+			sum = currBlock2->val + carry;
+			carryCount++;
+			carry = sum/power;
+			sum = sum%power;
+		}
+		else{
+			sum = currBlock2->val;
+		}
+		/*create resultant block and traverse to previous block*/
+		createBlock(addList, sum, 0);
+		currBlock2 = currBlock2->prev;
+	}
+	/*if addition of blocks at head also generate carry*/
+	if (carry)	createBlock(addList, carry, 0);
+	
+	addList->opCount = addCount + carryCount;	// total block operations for add
+	return addList;
+}
+
+/*function to subtract two linked lists i.e. numbers*/
+NUMBER* subtract(NUMBER *numList1, NUMBER *numList2, long int k){
+	BLOCK *currBlock1, *currBlock2;
+	NUMBER *subList = NEW(NUMBER);
+	unsigned long long subCount = 0, borrowCount = 0;	// no. of subtractions can be as much as number of digits i.e. long long
+	unsigned int power = pow(10, k);					// k <= 4; 10^k <= 10000;
+	unsigned int diff, borrow = 0;						// worst case diff = 9999 - 1 = 9998; carry = 0 or 1;
+	
+	/*initializing pointers to the tail of linked lists i.e last blocks*/
+	currBlock1 = numList1->tail;
+	currBlock2 = numList2->tail;
+	
+	/*loop to traverse through smaller number*/
+	while (currBlock2 != NULL){
+		/*checking which of the individual blocks are greater so as
+		  to decide if borrow is required or not*/
+		if (currBlock1->val > currBlock2->val){
+			diff = currBlock1->val - currBlock2->val - borrow;	// main subtraction
+			
+			/*counting block operations for subtraction of non-zero values and borrow*/
+			if (currBlock2->val != 0)
+				subCount++;
+			if (borrow)
+				borrowCount++;
+			borrow = 0;
+		}
+		else{
+			/*when borrow will be required; subCount incremented by 2*/
+			if (currBlock1->val < currBlock2->val){
+				diff = currBlock1->val + power - currBlock2->val - borrow;
+				subCount += 2;
+				if (borrow)
+					borrowCount++;
+				borrow = 1;
+				
+			}
+			/*when both block values are equal*/
+			else{
+				/*when borrow has occured in previous subtraction, a borrow will be required, else not*/
+				if (borrow){
+					diff = currBlock1->val + power - currBlock2->val - borrow;
+					subCount += 2;
+					borrow = 1;
+				}
+				else{
+					/*checking if both values are zero*/
+					if (currBlock1->val != 0){	//since they are equal, only 1 checked
+						diff = currBlock1->val - currBlock2->val;
+						subCount++;
+					}
+					else diff = 0;
+				}
+			}
+		}
+		
+		/*create resultant block and traverse to previous block*/
+		createBlock(subList, diff, 0);
+		currBlock1 = currBlock1->prev;
+		currBlock2 = currBlock2->prev;
+	}
+	
+	/*loop to traverse through remaining blocks of greater number*/
+	while(currBlock1 != NULL){
+		/*when borrow has occured in previous subtraction*/
+		if(borrow){
+			/*for a non-zero value, borrow not required*/
+			if (currBlock1->val != 0){
+				diff = currBlock1->val - borrow;
+				borrowCount++;
+				borrow = 0;
+			}
+			/*if zero value, new borrow wil be required*/
+			else{
+				diff = power - borrow;
+				subCount++;
+				borrowCount++;
+				borrow = 1;
+			}
+		}
+		/*when borrow has not occured in previous subtraction*/
+		else diff = currBlock1->val;
+		
+		/*create resultant block and traverse to previous block*/
+		createBlock(subList, diff, 0);
+		currBlock1 = currBlock1->prev;
+	}
+		
+	subList->opCount = subCount + borrowCount;	// total block operations for subract
+	return subList;
+}
+
+/*function to multiply two linked lists i.e. numbers*/
+NUMBER* multiply(NUMBER *numList1, NUMBER *numList2, int k){
+	BLOCK *currBlock1, *currBlock2;
+	NUMBER *resultList = NEW(NUMBER);
+	NUMBER *prodList1, *prodList2, *prodSumList;
+	unsigned int power = pow(10, k);		// k <= 4; 10^k <= 10000;
+	unsigned long prod;						// worst case prod = 9999*9999 = 99980001
+	unsigned int half1, half2;				// worst case size of half1, half2 = k
+	unsigned long long i = 0, j = 0;		// counters for index of blocks in each linked list from tail to head
+	unsigned long long zeroCount = 0, temp;	// to determine no. of zeros in each layer
+	unsigned long long mulCount = 0, addCount = 0;	// to calculate block operation counts
+	
+	/*initializing pointers to the tail of linked lists i.e last blocks*/
+	currBlock1 = numList1->tail;
+	currBlock2 = numList2->tail;
+	
+	/*loop to traverse through smaller number*/
+	while(currBlock2 != NULL){
+		
+		/*The left multiplcation is the classic school method  in which there
+		 *exists several 0s for 'longer' numbers.
+		 *The right method uses 4 linked lists; prodList1 & prodList2 which update prodSumList which 
+		 *in turn updates the resultList.
+		 *For each block of smaller number, lists prodList1 and prodList2 will contain the products
+		 *and will be added into prodSumList. prodSumList will be consistently added to resultList
+		 *which is the final result. 
+		  
+		For k=2;	111111    				   111111
+					x 9999		->			   x 9999
+					______		->		  ___________
+					  1089 >-------/======>  10891089 <-prodList1
+					1089XX 		  /			   1089XX <-prodList2	-> prodSumList->   10999989
+				  1089XXXX >-----/	/=====>10891089XX <-prodList1
+					1089XX >-------/	     1089XXXX <-prodList2	-> prodSumList-> 1099998900
+				  1089XXXX		  /	       __________								 __________
+				1089XXXXXX >-----/		   1110998889					resultList-> 1110998889
+				__________
+		  ans-> 1110998889
+
+		 */
+		
+		/*allocating lists in each iteration*/
+		prodList1 = NEW(NUMBER);
+		prodList2 = NEW(NUMBER);
+		
+		/*loop to append blocks of 0s at the end in each layer*/
+		for (temp = zeroCount; temp > 0; temp--)
+			createBlock(prodList1, 0, 0);
+		for (temp = zeroCount + 1; temp > 0; temp--)
+			createBlock(prodList2, 0, 0);
+		
+		/*loop to traverse through greater number for each block of smaller number*/
+		while(currBlock1 != NULL){
+			/*checking if either values are 0*/
+			if(currBlock1->val != 0 && currBlock2->val != 0){
+				prod = currBlock1->val * currBlock2->val;	//main multiplication
+				/*dividing the product into two blocks*/
+				half1 = prod/power;
+				half2 = prod%power;
+				mulCount++;
+			}
+			else half1 = half2 = 0;			
+			
+		   /*appends blocks to prodList1 & prodList2 depending 
+			*on the required offset in each layer
+			*/
+			if((i + j + zeroCount)%2){
+				createBlock(prodList2, half2, 0);
+				createBlock(prodList2, half1, 0);
+			}
+			else{
+				createBlock(prodList1, half2, 0);
+				createBlock(prodList1, half1, 0);
+			}
+			currBlock1 = currBlock1->prev;
+			j++;
+		}
+		
+	   /*addition of two lists belonging to each layer into prodSumList,
+	    *which is added into the final product, resultList.
+		*Intermediate prodSumList is required to get  
+		*accurate block operation counts that add up eventually.
+		*/
+		prodSumList = add(prodList1, prodList2, k);
+		addCount += prodSumList->opCount;
+		resultList = add(prodSumList, resultList, k);
+		addCount += resultList->opCount;
+		
+	    /*pointers traversing two numbers updated*/
+		currBlock1 = numList1->tail;
+		currBlock2 = currBlock2->prev;
+		i++;
+		j = 0;
+		zeroCount++;
+	}
+	
+	/*using free to deallocate linked lists*/
+	free(prodList1);
+	free(prodList2);
+	free(prodSumList);
+	
+	resultList->opCount = mulCount + addCount; // total block operations for multiply
+	return resultList;
+
+}
+
+/*function to output the calculated numbers into a file*/
+void writeToFile(FILE *f, NUMBER *numList, int k){
+	BLOCK *ptr;
+	unsigned int data, digit, power, blockCount = 0, zeroCount =0, isHead = 1, leadZero = 1;
+	int temp;
+	if (numList != NULL){
+		ptr = numList->head;
+		while (ptr != NULL){
+			data = ptr->val;
+			if (!data) zeroCount++;
+			blockCount++;
+			digit = 0;
+			/*condition to avoid printing trailing zeros*/
+			if(isHead){
+				for(temp = k-1; temp >= 0; temp--){
+					power = pow(10, temp);
+					digit = data/power;
+					data %= power;
+					if (!digit && leadZero) continue;
+					else{
+						fprintf(f, "%1d", digit);
+						leadZero = 0;	
+					}
+				isHead = 0;
+				}
+			}
+			else{
+			/*loop to create remaining blocks of size k*/
+				for(temp = k-1; temp >= 0; temp--){
+					power = pow(10, temp);
+					digit = data/power;
+					data %= power;
+					fprintf(f, "%1d", digit);
+				}
+			}
+			ptr = ptr->next;
+		}
+		if (zeroCount == blockCount) fprintf(f, "%d", 0);
+	}
+	return;	
+}
+
+/*function to compare numbers of equal no. of digits*/
+int compareNum(NUMBER *numList1, NUMBER *numList2){
+	BLOCK *ptr1, *ptr2;
+	ptr1 = numList1->head;
+	ptr2 = numList2->head;
+	
+	while(ptr1 != NULL){
+		/*iterate until any 2 values are unequal*/
+		if(ptr1->val == ptr2->val){
+			ptr1 = ptr1->next;
+			ptr2 = ptr2->next;
+			continue;
+		}
+		else{
+			if (ptr1->val > ptr2->val)	return 1;
+			else return 0;
+		}
+		ptr1 = ptr1->next;
+		ptr2 = ptr2->next;
+	}
+	return 1;
+}
+int main(int argc, char *argv[]){
+	/*checks number of command line arguments*/
+	if(argc != 5){
+		printf("Invalid Input\n");
+		terminate();
+	}
+	
+	/*opens files to operate on*/
+	FILE *f1, *f2, *f3;
+	f1 = fOpen(argv[2], "r");
+	f2 = fOpen(argv[3], "r");
+	f3 = fOpen(argv[4], "w+");
+	
+	int k = abs(atoi(argv[1])); //block size
+	
+   /*
+	*'infinitely' long numbers can be 0 to
+	*18,446,744,073,709,551,615 digits long in this program
+	*/
+	unsigned long long numLength1, numLength2;	
+	numLength1 = findLength(f1);
+	numLength2 = findLength(f2);
+	
+	/*allocated memory for numbers*/
+	NUMBER *numList1 = NEW(NUMBER);
+	NUMBER *numList2 = NEW(NUMBER);
+	NUMBER *addList, *subList, *mulList;
+	
+	/*create numbers from files*/
+	createNum(f1, numList1, numLength1, k);		
+	createNum(f2, numList2, numLength2, k);
+	
+	displayNumList(numList1);
+	displayNumList(numList2);
+	
+	/*addition can be done irrespective of no. of digits*/
+	addList = add(numList1, numList2, k);
+	
+   /*
+	*condition to find greater of the two numbers
+	*to subtract and multiply accordingly.
+	*subtract() requires greater number followed by 
+	*smaller as arguments for non-negative result.
+	*multiply() will use lesser iterations and longer
+	*linked lists in the function if provided with 
+	*greater number followed by smaller number
+	*/
+	if (numLength1 > numLength2){
+		subList = subtract(numList1, numList2, k);
+		mulList = multiply(numList1, numList2, k);		
+	}
+	else{
+		mulList = multiply(numList2, numList1, k);
+		if (numLength1 < numLength2)
+			subList = subtract(numList2, numList1, k);
+		else{
+			if (compareNum(numList1, numList2))
+				subList = subtract(numList1, numList2, k);
+			else subList = subtract(numList2, numList1, k);	
+		}
+	}
+	
+	/*writing calculated numbers with block operations to file*/
+	fprintf(f3, "sum: %llu block operations.\n", addList->opCount);
+	writeToFile(f3,addList, k);
+	fprintf(f3, "\ndifference: %llu block operations.\n", subList->opCount);
+	writeToFile(f3,subList, k);
+	fprintf(f3, "\nproduct: %llu block operations.\n", mulList->opCount);
+	writeToFile(f3,mulList, k);
+	
+	/*using free to deallocate linked lists*/
+	free(numList1);
+	free(numList2);
+	free(addList);
+	free(subList);
+	free(mulList);
+	
+	/*closes files*/
+	fclose(f1);
+	fclose(f2);
+	fclose(f3);
 }
